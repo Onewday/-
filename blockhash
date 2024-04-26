@@ -1,0 +1,62 @@
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+)
+
+type Block struct {
+	Hash              string
+	Version           int
+	PreviousBlockHash string
+	MerkleRoot        string
+	Time              int
+	Bits              int
+	Nonce             int
+}
+
+// 转换为小端序列
+func toLittle(name string) string {
+	bytes, _ := hex.DecodeString(name)
+	little := make([]byte, len(bytes))
+	for i := 0; i < len(bytes); i++ {
+		little[i] = bytes[len(bytes)-i-1]
+	}
+	return hex.EncodeToString(little)
+}
+
+// 计算区块头哈希
+func doubleSHA256(msg []byte) []byte {
+	hashed := sha256.Sum256(msg)
+	hashed = sha256.Sum256(hashed[:])
+	return hashed[:]
+}
+
+func main() {
+	// 区块信息
+	block := Block{
+		Hash:              "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+		Version:           1,
+		MerkleRoot:        "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+		Time:              1231006505,
+		Nonce:             2083236893,
+		Bits:              486604799,
+		PreviousBlockHash: "0000000000000000000000000000000000000000000000000000000000000000",
+	}
+
+	ver := toLittle(fmt.Sprintf("%08x", block.Version))
+	prev := toLittle(block.PreviousBlockHash)
+	merk := toLittle(block.MerkleRoot)
+	time := toLittle(fmt.Sprintf("%08x", block.Time))
+	bit := toLittle(fmt.Sprintf("%08x", block.Bits))
+	nonce := toLittle(fmt.Sprintf("%08x", block.Nonce))
+	blockHeader := ver + prev + merk + time + bit + nonce
+	fmt.Printf("头部信息(字符串):%s\n", blockHeader)
+	bytes, _ := hex.DecodeString(blockHeader)
+	fmt.Printf("头部信息(字节数组):%x\n", bytes)
+	hashed := doubleSHA256(bytes)
+	// 输出计算结果(小端表示)
+	fmt.Printf("两次SHA256后的结果(小端表示):%x\n", hashed)
+	fmt.Println("期望哈希值(大端表示):", block.Hash)
+}
