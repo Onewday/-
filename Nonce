@@ -1,0 +1,96 @@
+/*
+*给定区块头的信息，计算Nonce值
+*/
+package main
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"math/big"
+)
+
+type Block struct {
+	Version           int
+	PreviousBlockHash string
+	MerkleRoot        string
+	Timestamp         int
+	nbits             int
+	Nonce             int
+}
+
+func toLittle(s string) []byte {
+	bytes, _ := hex.DecodeString(s)
+	res := make([]byte, len(bytes))
+	for i := 0; i < len(bytes); i++ {
+		res[i] = bytes[len(bytes)-i-1]
+	}
+	return res
+}
+func doubleSHA256(blockheader []byte) []byte {
+	hashed := sha256.Sum256(blockheader)
+	hashed = sha256.Sum256(hashed[:])
+	return hashed[:]
+}
+func check(hashed []byte, target *big.Int) bool {
+	// 将哈希值和目标值转换为大整数
+	hashInt := new(big.Int).SetBytes(hashed)
+	// 检查哈希值是否小于目标值
+	return hashInt.Cmp(target) == -1
+}
+
+// 计算目标值
+func calculateTarget(nbits int) *big.Int {
+	// 解析难度目标值的字节表示
+	exponent := uint(nbits >> 24)
+	mantissa := uint(nbits & 0x7fffff)
+
+	// 计算目标值
+	target := new(big.Int).Lsh(big.NewInt(int64(mantissa)), 8*(exponent-3))
+	return target
+}
+
+// 反转字节数组
+func reverseBytes(b []byte) []byte {
+	for i := 0; i < len(b)/2; i++ {
+		j := len(b) - i - 1
+		b[i], b[j] = b[j], b[i]
+	}
+	return b
+}
+func main() {
+	block := Block{
+		Version:           1,
+		PreviousBlockHash: "0000000000000000000000000000000000000000000000000000000000000000",
+		MerkleRoot:        "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
+		Timestamp:         1231006505,
+		nbits:             486604799,
+	}
+	//获取头部信息（小端字节序）
+	ver := toLittle(fmt.Sprintf("%08x", block.Version))
+	phash := toLittle(block.PreviousBlockHash)
+	mer := toLittle(block.MerkleRoot)
+	time := toLittle(fmt.Sprintf("%08x", block.Timestamp))
+	difficulty := toLittle(fmt.Sprintf("%08x", block.nbits))
+	blockheader := append(ver, phash...)
+	blockheader = append(blockheader, mer...)
+	blockheader = append(blockheader, time...)
+	blockheader = append(blockheader, difficulty...)
+	//获取目标难度值
+	target := calculateTarget(block.nbits)
+	//加上Nonce
+	for i := 0; ; i++ {
+		fmt.Println("i:", i)
+		Nonce := toLittle(fmt.Sprintf("%08x", i))
+		header := append(blockheader, Nonce...)
+		hash := doubleSHA256(header)
+		hash = reverseBytes(hash)
+		fmt.Printf("哈希值:%x\n", hash)
+		//比较区块哈希值是否小于目标难度
+		if check(hash, target) {
+			fmt.Println("Nonce:", i)
+			break
+		}
+	}
+	fmt.Printf("头部信息（字节数组）:%x\n", blockheader)
+}
